@@ -1,9 +1,9 @@
 import pygame
-from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent
+from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadAgent
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.4")
+pygame.display.set_caption("Space Governance Sim V2.5")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
 small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
@@ -21,7 +21,8 @@ HUBS = {
     "Water Treatment": {"pos": (500, 150), "risk": 0.4, "purpose": "survival"},      # Spoke N
     "Research Lab": {"pos": (300, 450), "risk": 0.5, "purpose": "innovation"},       # Spoke S
     "Mining Outpost": {"pos": (500, 450), "risk": 0.7, "purpose": "resources"},      # Spoke S
-    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"}            # Spoke top
+    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"},           # Spoke top
+    "Morgue": {"pos": (450, 300), "risk": 0.1, "purpose": "absorbing"}              # Near center for visibility
 }
 
 def draw(model):
@@ -51,7 +52,11 @@ def draw(model):
             pygame.draw.circle(screen, color, (x, y), 5)
         elif isinstance(agent, PrisonAgent):
             x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
-            pygame.draw.circle(screen, (128, 128, 128), (x, y), 5, 2)  # Grey outline for prisoners
+            color = (255, 0, 0) if agent.is_bad else (128, 128, 128)  # Red for bad, grey for others
+            pygame.draw.circle(screen, color, (x, y), 5, 2)  # Grey outline for prisoners
+        elif isinstance(agent, DeadAgent):
+            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline for dead
 
     # Dashboard (top area)
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, 800, 100))  # Grey dashboard background
@@ -60,7 +65,8 @@ def draw(model):
         f"Civility: {model.civility}",
         f"Resources: {model.resources}",
         f"Conflict Rate: {model.conflict_rate:.2f}",
-        f"Stress: {model.stress:.0f}"
+        f"Stress: {model.stress:.0f}",
+        f"Population: {len(model.living_settlers)}"
     ]
     for i, text in enumerate(metrics):
         rendered = font.render(text, True, (255, 255, 255))

@@ -11,7 +11,8 @@ HUBS = {
     "Water Treatment": {"pos": (500, 150), "risk": 0.4, "purpose": "survival"},      # Spoke N
     "Research Lab": {"pos": (300, 450), "risk": 0.5, "purpose": "innovation"},       # Spoke S
     "Mining Outpost": {"pos": (500, 450), "risk": 0.7, "purpose": "resources"},      # Spoke S
-    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"}            # Spoke top
+    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"},           # Spoke top
+    "Morgue": {"pos": (450, 300), "risk": 0.1, "purpose": "absorbing"}              # Near center for visibility
 }
 
 def get_hub_position(hub_name):
