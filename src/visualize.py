@@ -3,25 +3,25 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.2")
+pygame.display.set_caption("Space Governance Sim V2.3")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
 small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
 
 # Hub definitions (from model.py)
 HUBS = {
-    "Command Center": {"pos": (50, 50), "risk": 0.1, "purpose": "governance"},
-    "Factory": {"pos": (150, 100), "risk": 0.5, "purpose": "production"},
-    "Farming Module": {"pos": (250, 150), "risk": 0.2, "purpose": "survival"},
-    "Housing District": {"pos": (350, 200), "risk": 0.1, "purpose": "living"},
-    "Entertainment District": {"pos": (450, 250), "risk": 0.8, "purpose": "social"},
-    "Gym/Recreation": {"pos": (550, 300), "risk": 0.4, "purpose": "morale"},
-    "Power Plant": {"pos": (650, 350), "risk": 0.7, "purpose": "infrastructure"},
-    "Water Treatment": {"pos": (100, 400), "risk": 0.4, "purpose": "survival"},
-    "Medical Bay": {"pos": (200, 450), "risk": 0.2, "purpose": "health"},
-    "Research Lab": {"pos": (300, 500), "risk": 0.5, "purpose": "innovation"},
-    "Mining Outpost": {"pos": (400, 550), "risk": 0.7, "purpose": "resources"},
-    "Prison Hub": {"pos": (500, 600), "risk": 0.9, "purpose": "security"}
+    "Housing District": {"pos": (400, 300), "risk": 0.1, "purpose": "living"},  # Center
+    "Gym/Recreation": {"pos": (400, 250), "risk": 0.4, "purpose": "morale"},    # Center
+    "Medical Bay": {"pos": (400, 350), "risk": 0.2, "purpose": "health"},        # Center
+    "Command Center": {"pos": (200, 200), "risk": 0.1, "purpose": "governance"},  # Spoke NW
+    "Factory": {"pos": (600, 200), "risk": 0.5, "purpose": "production"},        # Spoke NE
+    "Farming Module": {"pos": (200, 400), "risk": 0.2, "purpose": "survival"},   # Spoke SW
+    "Entertainment District": {"pos": (600, 400), "risk": 0.8, "purpose": "social"},  # Spoke SE
+    "Power Plant": {"pos": (300, 150), "risk": 0.7, "purpose": "infrastructure"},    # Spoke N
+    "Water Treatment": {"pos": (500, 150), "risk": 0.4, "purpose": "survival"},      # Spoke N
+    "Research Lab": {"pos": (300, 450), "risk": 0.5, "purpose": "innovation"},       # Spoke S
+    "Mining Outpost": {"pos": (500, 450), "risk": 0.7, "purpose": "resources"},      # Spoke S
+    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"}            # Spoke top
 }
 
 def draw(model):
@@ -59,7 +59,8 @@ def draw(model):
         f"Week: {model.week}",
         f"Civility: {model.civility}",
         f"Resources: {model.resources}",
-        f"Conflict Rate: {model.conflict_rate:.2f}"
+        f"Conflict Rate: {model.conflict_rate:.2f}",
+        f"Stress: {model.stress:.0f}"  # Added stress to dashboard
     ]
     for i, text in enumerate(metrics):
         rendered = font.render(text, True, (255, 255, 255))
