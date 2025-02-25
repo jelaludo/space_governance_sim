@@ -16,21 +16,29 @@ class SettlerAgent(Agent):
     def step(self):
         hub_pos = HUBS[self.target_hub]["pos"]
         target_x, target_y = hub_pos
-        # Move toward target hub more slowly, clamp to stay on-screen
+        # Move toward target hub more slowly, clamp to stay on-screen, add slight jitter
         new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slow movement
         new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slow movement
-        self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
-        # Randomly change hub based on purpose and stress, increase remote hub visits
-        if random.random() < 0.2:  # Increased chance for more movement
+        jitter_x = random.randint(-5, 5)  # Slight random jitter for vibrancy
+        jitter_y = random.randint(-5, 5)  # Slight random jitter for vibrancy
+        self.pos = (max(5, min(795, new_x + jitter_x)), max(5, min(595, new_y + jitter_y)))
+        # Randomly change hub based on purpose and stress, increase farm/factory visits
+        if random.random() < 0.3:  # Increased chance for more movement (30%)
             if self.is_bad and self.revealed:
                 self.target_hub = random.choice(["Entertainment District", "Power Plant", "Mining Outpost", "Prison Hub"])
             else:
-                purposes = [h for h in HUBS if HUBS[h]["purpose"] in ["living", "morale", "health", "survival"]]
-                remote_hubs = ["Power Plant", "Mining Outpost", "Research Lab"]
-                if random.random() < 0.1:  # 10% chance to visit a remote hub
-                    self.target_hub = random.choice(remote_hubs)
+                if random.random() < 0.2:  # 20% chance each for Farm and Factory
+                    self.target_hub = random.choice(["Farming Module", "Factory"])
                 else:
-                    self.target_hub = random.choice(purposes)
+                    purposes = [h for h in HUBS if HUBS[h]["purpose"] in ["living", "morale", "health", "survival"]]
+                    remote_hubs = ["Power Plant", "Mining Outpost", "Research Lab"]
+                    if random.random() < 0.1:  # 10% chance to visit a remote hub
+                        self.target_hub = random.choice(remote_hubs)
+                    else:
+                        self.target_hub = random.choice(purposes)
+        # Increase resources when visiting Farm or Factory
+        if self.target_hub in ["Farming Module", "Factory"]:
+            self.model.resources = min(200, self.model.resources + random.randint(1, 3))  # Cap resources at 200, increase by 1-3
 
     def reduce_stress(self):
         # Reduce stress when visiting morale-boosting hubs
@@ -88,16 +96,18 @@ class LEAgent(Agent):
                 self.model.changes_log.append(f"Week {self.model.week}: Bad actor imprisoned by LEO, -5 resources, -10 stress, Prison now {self.model.prison_count}")
                 self.chasing = None  # Stop chasing
         else:
-            # Systematic patrol of all hubs, slower movement
+            # Systematic patrol of all hubs in fixed order, no randomness, slower movement
             hubs = list(HUBS.keys())
             self.patrol_index = (self.patrol_index + 1) % len(hubs)  # Always systematic, no randomness
             self.target_hub = hubs[self.patrol_index]
             hub_pos = HUBS[self.target_hub]["pos"]
             target_x, target_y = hub_pos
-            # Move toward target hub more slowly, clamp to stay on-screen
+            # Move toward target hub more slowly, clamp to stay on-screen, add slight jitter
             new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slower movement
             new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slower movement
-            self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
+            jitter_x = random.randint(-5, 5)  # Slight random jitter for vibrancy
+            jitter_y = random.randint(-5, 5)  # Slight random jitter for vibrancy
+            self.pos = (max(5, min(795, new_x + jitter_x)), max(5, min(595, new_y + jitter_y)))
             # Check for bad actors acting violently to initiate chase
             for agent in self.model.agents:
                 if isinstance(agent, SettlerAgent) and agent.is_bad and agent.revealed:
@@ -111,7 +121,7 @@ class GovernanceModel(Model):
     def __init__(self):
         super().__init__()
         self.civility = 50
-        self.resources = 100  # Initial resources
+        self.resources = 100  # Initial resources, cap at 200
         self.week = 0
         self.steps_per_week = 100  # 100 steps = 1 week for slower observation
         self.step_count = 0
@@ -150,8 +160,8 @@ class GovernanceModel(Model):
         # Handle bad actors, incidents, deaths, and stress effects
         for agent in list(self.agents):  # Use list to modify agents during iteration
             if isinstance(agent, SettlerAgent):
-                # Check for stress-induced bad behavior
-                if not agent.is_bad and random.random() < (self.stress / 1000):  # 0.1% per stress point
+                # Check for stress-induced bad behavior (slower transition)
+                if not agent.is_bad and random.random() < (self.stress / 2000):  # Reduced to 0.05% per stress point
                     agent.is_bad = True
                     agent.revealed = False  # Starts as hidden (orange)
                     adjust_stress(self, 5, "Good actor turned bad due to stress")
@@ -164,17 +174,17 @@ class GovernanceModel(Model):
                     if len(nearby_agents) < 2 and random.random() < 0.05:  # Reduced to 5% for slower population drop
                         self.civility -= 3  # Incident reduces civility
                         adjust_stress(self, 10, "Incident - Bad actor attacked isolated settler")
-                        # Check for death from violent assault (reduced to 10%)
-                        if random.random() < 0.1:
+                        # Check for death from violent assault (reduced to 3%)
+                        if random.random() < 0.03:
                             self.handle_death(agent, "Violent assault by bad actor")
                         # Trigger LEO chase (handled in LEAgent.step())
 
-                # Check for death at Medical Bay (reduced to 1%)
-                if agent.target_hub == "Medical Bay" and random.random() < 0.01:
+                # Check for death at Medical Bay (reduced to 0.3%)
+                if agent.target_hub == "Medical Bay" and random.random() < 0.003:
                     self.handle_death(agent, "Medical complications")
                 
-                # Check for death at damaged hubs after adverse events (reduced to 3%)
-                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"] and random.random() < 0.03:
+                # Check for death at damaged hubs after adverse events (reduced to 1%)
+                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"] and random.random() < 0.01:
                     self.handle_death(agent, "Risky repair at damaged hub")
 
         # Apply prison upkeep cost and stress reduction

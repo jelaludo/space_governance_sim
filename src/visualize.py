@@ -2,11 +2,11 @@ import pygame
 from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadAgent
 
 pygame.init()
-screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.8")
+screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard and glossary
+pygame.display.set_caption("Space Governance Sim V2.9")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
-small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
+small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels and glossary
 tiny_font = pygame.font.Font(None, 14)  # Tiny font for change log
 
 # Hub definitions (import from hubs.py, but include here for completeness)
@@ -28,6 +28,20 @@ HUBS = {
 
 def draw(model):
     screen.fill((0, 0, 0))
+    # Draw glossary on the left
+    glossary = [
+        "Grey Circle/Square: Neutral Settler",
+        "Orange Circle/Square: Hidden Bad Actor",
+        "Red Circle/Square: Revealed Bad Actor",
+        "Blue Circle: Good Law Enforcement",
+        "Purple Circle: Corrupt Law Enforcement",
+        "Dark Grey Circle: Dead Agent"
+    ]
+    pygame.draw.rect(screen, (50, 50, 50), (0, 0, 200, 600))  # Grey background for glossary
+    for i, text in enumerate(glossary):
+        rendered = small_font.render(text, True, (255, 255, 255))
+        screen.blit(rendered, (10, 10 + i * 20))
+
     # Draw hubs with colors based on risk and counters
     for hub_name, hub in HUBS.items():
         risk = hub["risk"]
@@ -50,22 +64,22 @@ def draw(model):
     for agent in model.agents:
         if isinstance(agent, SettlerAgent):
             color = (255, 0, 0) if agent.is_bad and agent.revealed else (255, 165, 0) if agent.is_bad else (128, 128, 128)
-            # Clamp position to stay within 800x600
-            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            # Clamp position to stay within 800x600, adjust for glossary
+            x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             if agent.gender == "M":
                 pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))
             else:
                 pygame.draw.circle(screen, color, (x, y), 5)
         elif isinstance(agent, LEAgent):
             color = (255, 0, 128) if agent.is_bad else (0, 0, 255)  # Purple for corrupt, blue for good
-            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             pygame.draw.circle(screen, color, (x, y), 5)
         elif isinstance(agent, PrisonAgent):
-            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             color = (255, 0, 0) if agent.is_bad else (128, 128, 128)  # Red for bad, grey for others
             pygame.draw.circle(screen, color, (x, y), 5, 2)  # Grey outline for prisoners
         elif isinstance(agent, DeadAgent):
-            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline for dead
 
     # Dashboard (top area, remove Morgue and Prison counters)
@@ -80,7 +94,7 @@ def draw(model):
     ]
     for i, text in enumerate(metrics):
         rendered = font.render(text, True, (255, 255, 255))
-        screen.blit(rendered, (10, 10 + i * 20))
+        screen.blit(rendered, (210, 10 + i * 20))  # Shift right to avoid glossary
 
     # Change log (scrolling text, smaller font)
     changes = model.changes_log[-5:]  # Show last 5 changes
@@ -89,7 +103,7 @@ def draw(model):
         screen.blit(rendered, (400, 10 + i * 15))  # Tighter spacing for smaller text
 
     # Civility gauge (bottom)
-    pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (10, 550, model.civility * 4, 10))
+    pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (210, 550, model.civility * 4, 10))  # Shift right to avoid glossary
     pygame.display.flip()
 
 def run():

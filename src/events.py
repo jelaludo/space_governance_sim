@@ -51,6 +51,7 @@ def new_settler_arrival(model):
         gender = random.choice(["M", "F"])
         is_bad = random.random() < 0.15  # 15% chance new settlers are bad
         settler = SettlerAgent(model, gender, is_bad)
+        model.living_agents.append(settler)  # Track in living agents
         model.agents.add(settler)
     model.changes_log.append(f"Week {model.week}: 5 New Settlers Arrived, +15 stress")
 
@@ -129,10 +130,18 @@ def sabotage_attempt(model):
 
 def new_supply_from_colony(model):
     from src.stressors import adjust_stress
-    from src.model import GovernanceModel  # Dynamic import to avoid circular issues
+    from src.model import GovernanceModel, SettlerAgent  # Dynamic import to avoid circular issues
     adjust_stress(model, -20, "New Supply from Colony")
-    model.resources += 30
-    model.changes_log.append(f"Week {model.week}: New Supply from Colony, +30 resources, -20 stress")
+    model.resources += 80  # Increased supply boost (50 + 30 from resources)
+    # Add 5-10 new settlers
+    num_settlers = random.randint(5, 10)
+    for _ in range(num_settlers):
+        gender = random.choice(["M", "F"])
+        is_bad = random.random() < 0.1  # 10% chance new settlers are bad (lower than arrivals)
+        settler = SettlerAgent(model, gender, is_bad)
+        model.living_agents.append(settler)  # Track in living agents
+        model.agents.add(settler)
+    model.changes_log.append(f"Week {model.week}: New Supply from Colony, +{num_settlers} settlers, +80 resources, -20 stress")
 
 def morale_boost_after_fix(model):
     from src.stressors import adjust_stress
