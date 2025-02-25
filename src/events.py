@@ -24,7 +24,7 @@ def trigger_random_event(model):
     for name, weight, action in events:
         cumulative += weight
         if choice <= cumulative:
-            model.changes_log.append(f"Week {model.week}: Event - {name}")
+            model.changes_log.append(f"Day {model.week}: Event - {name}")
             action()
             break
 
@@ -33,15 +33,15 @@ def power_plant_break(model):
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, 20, "Power Plant Break - Increased visits required")
     model.resources -= 10
-    model.changes_log.append(f"Week {model.week}: Power Plant Break - Increased visits required, -10 resources")
+    model.changes_log.append(f"Day {model.week}: Power Plant Break - Increased visits required, -10 resources")
 
 def environmental_hardship(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, 30, "Environmental Hardship for 2 weeks")
     model.resources -= 15
-    model.step_count += 20  # Lasts 2 weeks (20 steps)
-    model.changes_log.append(f"Week {model.week}: Environmental Hardship for 2 weeks, -15 resources")
+    model.step_count += 14  # Lasts 2 weeks (14 days)
+    model.changes_log.append(f"Day {model.week}: Environmental Hardship for 2 weeks, -15 resources")
 
 def new_settler_arrival(model):
     from src.stressors import adjust_stress
@@ -53,14 +53,14 @@ def new_settler_arrival(model):
         settler = SettlerAgent(model, gender, is_bad)
         model.living_agents.append(settler)  # Track in living agents
         model.agents.add(settler)
-    model.changes_log.append(f"Week {model.week}: 5 New Settlers Arrived, +15 stress")
+    model.changes_log.append(f"Day {model.week}: 5 New Settlers Arrived, +15 stress")
 
 def food_shortage(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, 25, "Food Shortage")
     model.resources -= 20
-    model.changes_log.append(f"Week {model.week}: Food Shortage, -20 resources")
+    model.changes_log.append(f"Day {model.week}: Food Shortage, -20 resources")
 
 def oxygen_leak(model):
     from src.stressors import adjust_stress
@@ -68,7 +68,7 @@ def oxygen_leak(model):
     adjust_stress(model, 40, "Oxygen Leak")
     model.resources -= 30
     model.civility -= 10
-    model.changes_log.append(f"Week {model.week}: Oxygen Leak, -30 resources, -10 civility")
+    model.changes_log.append(f"Day {model.week}: Oxygen Leak, -30 resources, -10 civility")
 
 def equipment_failure(model):
     from src.stressors import adjust_stress
@@ -77,14 +77,14 @@ def equipment_failure(model):
     adjust_stress(model, 15, "Equipment Failure")
     model.resources -= 10
     hub = random.choice(list(HUBS.keys()))
-    model.changes_log.append(f"Week {model.week}: Equipment Failure at {hub}, -10 resources")
+    model.changes_log.append(f"Day {model.week}: Equipment Failure at {hub}, -10 resources")
 
 def meteor_threat(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, 30, "Meteor Threat")
     model.civility -= 5
-    model.changes_log.append(f"Week {model.week}: Meteor Threat, -5 civility")
+    model.changes_log.append(f"Day {model.week}: Meteor Threat, -5 civility")
 
 def corruption_scandal(model):
     from src.stressors import adjust_stress
@@ -94,14 +94,14 @@ def corruption_scandal(model):
     for agent in model.agents:
         if isinstance(agent, LEAgent) and random.random() < 0.3:  # 30% chance any LEO is corrupt
             agent.is_bad = True
-    model.changes_log.append(f"Week {model.week}: Corruption Scandal, -15 civility")
+    model.changes_log.append(f"Day {model.week}: Corruption Scandal, -15 civility")
 
 def tech_breakthrough(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, -10, "Tech Breakthrough")
     model.resources += 15
-    model.changes_log.append(f"Week {model.week}: Tech Breakthrough, +15 resources, -10 stress")
+    model.changes_log.append(f"Day {model.week}: Tech Breakthrough, +15 resources, -10 stress")
 
 def disease_outbreak(model):
     from src.stressors import adjust_stress
@@ -109,14 +109,14 @@ def disease_outbreak(model):
     adjust_stress(model, 20, "Disease Outbreak")
     model.resources -= 20
     model.civility -= 5
-    model.changes_log.append(f"Week {model.week}: Disease Outbreak, -20 resources, -5 civility")
+    model.changes_log.append(f"Day {model.week}: Disease Outbreak, -20 resources, -5 civility")
 
 def resource_discovery(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, -15, "Resource Discovery")
     model.resources += 25
-    model.changes_log.append(f"Week {model.week}: Resource Discovery, +25 resources, -15 stress")
+    model.changes_log.append(f"Day {model.week}: Resource Discovery, +25 resources, -15 stress")
 
 def sabotage_attempt(model):
     from src.stressors import adjust_stress
@@ -126,7 +126,7 @@ def sabotage_attempt(model):
     for agent in model.agents:
         if isinstance(agent, SettlerAgent) and agent.is_bad and random.random() < 0.2:
             agent.revealed = True  # Reveal bad actors involved in sabotage
-    model.changes_log.append(f"Week {model.week}: Sabotage Attempt, -10 civility")
+    model.changes_log.append(f"Day {model.week}: Sabotage Attempt, -10 civility")
 
 def new_supply_from_colony(model):
     from src.stressors import adjust_stress
@@ -141,11 +141,11 @@ def new_supply_from_colony(model):
         settler = SettlerAgent(model, gender, is_bad)
         model.living_agents.append(settler)  # Track in living agents
         model.agents.add(settler)
-    model.changes_log.append(f"Week {model.week}: New Supply from Colony, +{num_settlers} settlers, +80 resources, -20 stress")
+    model.changes_log.append(f"Day {model.week}: New Supply from Colony, +{num_settlers} settlers, +80 resources, -20 stress")
 
 def morale_boost_after_fix(model):
     from src.stressors import adjust_stress
     from src.model import GovernanceModel  # Dynamic import to avoid circular issues
     adjust_stress(model, -15, "Morale Boost After Fix")
     model.civility += 5
-    model.changes_log.append(f"Week {model.week}: Morale Boost After Fix, +5 civility, -15 stress")
+    model.changes_log.append(f"Day {model.week}: Morale Boost After Fix, +5 civility, -15 stress")
