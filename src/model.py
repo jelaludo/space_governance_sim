@@ -17,16 +17,20 @@ class SettlerAgent(Agent):
         hub_pos = HUBS[self.target_hub]["pos"]
         target_x, target_y = hub_pos
         # Move toward target hub more slowly, clamp to stay on-screen
-        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Keep slow movement
-        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Keep slow movement
+        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slow movement
+        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slow movement
         self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
-        # Randomly change hub based on purpose and stress
+        # Randomly change hub based on purpose and stress, increase remote hub visits
         if random.random() < 0.2:  # Increased chance for more movement
             if self.is_bad and self.revealed:
                 self.target_hub = random.choice(["Entertainment District", "Power Plant", "Mining Outpost", "Prison Hub"])
             else:
                 purposes = [h for h in HUBS if HUBS[h]["purpose"] in ["living", "morale", "health", "survival"]]
-                self.target_hub = random.choice(purposes)
+                remote_hubs = ["Power Plant", "Mining Outpost", "Research Lab"]
+                if random.random() < 0.1:  # 10% chance to visit a remote hub
+                    self.target_hub = random.choice(remote_hubs)
+                else:
+                    self.target_hub = random.choice(purposes)
 
     def reduce_stress(self):
         # Reduce stress when visiting morale-boosting hubs
@@ -62,22 +66,46 @@ class LEAgent(Agent):
         self.is_bad = is_bad  # Corrupt LEO chance (e.g., 5%)
         self.pos = (random.randint(0, 700), random.randint(0, 550))  # Larger area for 800x600
         self.patrol_index = 0  # Track current patrol hub
+        self.chasing = None  # Track if chasing a bad actor
 
     def step(self):
-        # Patrol all hubs more actively, prioritize systematic patrols
-        hubs = list(HUBS.keys())
-        if random.random() < 0.9:  # 90% chance to patrol systematically, 10% random for variety
-            self.patrol_index = (self.patrol_index + 1) % len(hubs)
-            self.target_hub = hubs[self.patrol_index]
+        if self.chasing:
+            # Chase the bad actor directly
+            bad_actor_pos = self.chasing.pos
+            target_x, target_y = bad_actor_pos
+            new_x = self.pos[0] + (target_x - self.pos[0]) // 10  # Faster chase
+            new_y = self.pos[1] + (target_y - self.pos[1]) // 10  # Faster chase
+            self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
+            # Check if close enough to escort to prison
+            if abs(self.pos[0] - bad_actor_pos[0]) < 10 and abs(self.pos[1] - bad_actor_pos[1]) < 10:
+                self.model.agents.remove(self.chasing)
+                prisoner = PrisonAgent(self.model, self.chasing)
+                self.model.agents.add(prisoner)
+                self.model.resources -= 5  # Resource cost for prison
+                self.model.civility = max(0, self.model.civility - 2)  # Slight civility drop
+                adjust_stress(self.model, -10, "Bad actor imprisoned, reducing stress for good actors")  # Stress reduction
+                self.model.prison_count += 1  # Increment prison counter
+                self.model.changes_log.append(f"Week {self.model.week}: Bad actor imprisoned by LEO, -5 resources, -10 stress, Prison now {self.model.prison_count}")
+                self.chasing = None  # Stop chasing
         else:
-            self.target_hub = random.choice(hubs)
-        
-        hub_pos = HUBS[self.target_hub]["pos"]
-        target_x, target_y = hub_pos
-        # Move toward target hub faster, clamp to stay on-screen
-        new_x = self.pos[0] + (target_x - self.pos[0]) // 10  # Faster movement for patrols
-        new_y = self.pos[1] + (target_y - self.pos[1]) // 10  # Faster movement for patrols
-        self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
+            # Systematic patrol of all hubs, slower movement
+            hubs = list(HUBS.keys())
+            self.patrol_index = (self.patrol_index + 1) % len(hubs)  # Always systematic, no randomness
+            self.target_hub = hubs[self.patrol_index]
+            hub_pos = HUBS[self.target_hub]["pos"]
+            target_x, target_y = hub_pos
+            # Move toward target hub more slowly, clamp to stay on-screen
+            new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slower movement
+            new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slower movement
+            self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
+            # Check for bad actors acting violently to initiate chase
+            for agent in self.model.agents:
+                if isinstance(agent, SettlerAgent) and agent.is_bad and agent.revealed:
+                    nearby_agents = [other for other in self.model.agents if isinstance(other, SettlerAgent) and other != agent and 
+                                    abs(other.pos[0] - agent.pos[0]) < 50 and abs(other.pos[1] - agent.pos[1]) < 50]
+                    if len(nearby_agents) < 2 and random.random() < 0.05:  # Reduced to 5% for slower population drop
+                        self.chasing = agent  # Start chasing this bad actor
+                        break
 
 class GovernanceModel(Model):
     def __init__(self):
@@ -90,21 +118,24 @@ class GovernanceModel(Model):
         self.conflict_rate = 0
         self.changes_log = []  # Log of key changes
         self.stress = 0  # New stress metric (0-100)
+        self.morgue_count = 0  # Counter for dead agents in Morgue
+        self.prison_count = 0  # Counter for imprisoned agents in Prison
 
         # Update HUBS to include Morgue
         HUBS["Morgue"] = {"pos": (450, 300), "risk": 0.1, "purpose": "absorbing"}  # Near center for visibility
 
-        # Create agents with unique IDs assigned by Mesa
-        self.living_settlers = []
-        for i in range(20):  # Settlers
-            gender = "M" if i < 10 else "F"  # Half men, half women
+        # Create agents with unique IDs assigned by Mesa, double initial population
+        self.living_agents = []  # Track all living agents (settlers + LEOs)
+        for i in range(40):  # Double settlers to 40
+            gender = "M" if i < 20 else "F"  # Half men, half women
             is_bad = random.random() < 0.1  # 10% bad actors
             agent = SettlerAgent(self, gender, is_bad)
-            self.living_settlers.append(agent)
+            self.living_agents.append(agent)
             self.agents.add(agent)
-        for i in range(2):  # 2 LEOs
+        for i in range(4):  # Double LEOs to 4
             is_bad = random.random() < 0.05  # 5% chance of corrupt LEO
             le_agent = LEAgent(self, is_bad)
+            self.living_agents.append(le_agent)
             self.agents.add(le_agent)
 
     def step(self):
@@ -113,7 +144,7 @@ class GovernanceModel(Model):
             self.week += 1
             self.trigger_random_event()  # Trigger a random event every other week for slower pace
             self.reduce_stress_over_time()  # Reduce stress based on conditions
-            self.changes_log.append(f"Week {self.week}: Civility {self.civility}, Resources {self.resources}, Stress {self.stress}, Population {len(self.living_settlers)}")
+            self.changes_log.append(f"Week {self.week}: Civility {self.civility}, Resources {self.resources}, Stress {self.stress}, Population {len(self.living_agents)}, Morgue {self.morgue_count}, Prison {self.prison_count}")
 
         self.agents.shuffle_do("step")  # Randomly activate agents
         # Handle bad actors, incidents, deaths, and stress effects
@@ -136,17 +167,7 @@ class GovernanceModel(Model):
                         # Check for death from violent assault (reduced to 10%)
                         if random.random() < 0.1:
                             self.handle_death(agent, "Violent assault by bad actor")
-                        # Trigger LEO response
-                        nearby_leos = [leo for leo in self.agents if isinstance(leo, LEAgent) and 
-                                      abs(leo.pos[0] - agent.pos[0]) < 50 and abs(leo.pos[1] - agent.pos[1]) < 50]
-                        if nearby_leos and random.random() < 0.7:  # 70% chance LEOs respond
-                            self.agents.remove(agent)
-                            prisoner = PrisonAgent(self, agent)
-                            self.agents.add(prisoner)
-                            self.resources -= 5  # Resource cost for prison
-                            self.civility = max(0, self.civility - 2)  # Slight civility drop
-                            adjust_stress(self, -10, "Bad actor imprisoned, reducing stress for good actors")  # Stress reduction
-                            self.changes_log.append(f"Week {self.week}: Bad actor imprisoned, -5 resources, -10 stress")
+                        # Trigger LEO chase (handled in LEAgent.step())
 
                 # Check for death at Medical Bay (reduced to 1%)
                 if agent.target_hub == "Medical Bay" and random.random() < 0.01:
@@ -168,13 +189,14 @@ class GovernanceModel(Model):
         self.update_metrics()
 
     def handle_death(self, agent, reason):
-        if agent in self.living_settlers:
-            self.living_settlers.remove(agent)
+        if agent in self.living_agents:
+            self.living_agents.remove(agent)
             self.agents.remove(agent)
             dead_agent = DeadAgent(self, agent)
             self.agents.add(dead_agent)
+            self.morgue_count += 1  # Increment morgue counter
             adjust_stress(self, 15, f"Death due to {reason}")
-            self.changes_log.append(f"Week {self.week}: Death - {reason}, Population now {len(self.living_settlers)}")
+            self.changes_log.append(f"Week {self.week}: Death - {reason}, Population now {len(self.living_agents)}, Morgue now {self.morgue_count}")
 
     def trigger_random_event(self):
         from src.events import trigger_random_event  # Import here to avoid circular imports
@@ -189,6 +211,6 @@ class GovernanceModel(Model):
             adjust_stress(self, -10, "Long time without incidents reduces stress")
 
     def update_metrics(self):
-        bad_actors = sum(1 for a in self.living_settlers if a.is_bad and a.revealed)
-        total_settlers = len(self.living_settlers)
-        self.conflict_rate = bad_actors / total_settlers if total_settlers > 0 else 0
+        bad_actors = sum(1 for a in self.living_agents if isinstance(a, SettlerAgent) and a.is_bad and a.revealed)
+        total_agents = len(self.living_agents)  # Include LEOs in population
+        self.conflict_rate = bad_actors / total_agents if total_agents > 0 else 0

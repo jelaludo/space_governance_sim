@@ -3,7 +3,7 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadA
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.6")
+pygame.display.set_caption("Space Governance Sim V2.8")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
 small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
@@ -28,7 +28,7 @@ HUBS = {
 
 def draw(model):
     screen.fill((0, 0, 0))
-    # Draw hubs with colors based on risk
+    # Draw hubs with colors based on risk and counters
     for hub_name, hub in HUBS.items():
         risk = hub["risk"]
         color = (0, 255, 0) if risk < 0.3 else (255, 255, 0) if risk < 0.6 else (255, 0, 0)
@@ -36,6 +36,15 @@ def draw(model):
         # Label hubs above with smaller font
         rendered = small_font.render(hub_name, True, (255, 255, 255))
         screen.blit(rendered, (hub["pos"][0] - rendered.get_width() // 2, hub["pos"][1] - 25))
+        # Display counters inside Prison Hub and Morgue
+        if hub_name == "Prison Hub":
+            counter_text = f"Prison: {model.prison_count}"
+            counter_rendered = small_font.render(counter_text, True, (255, 255, 255))
+            screen.blit(counter_rendered, (hub["pos"][0] - counter_rendered.get_width() // 2, hub["pos"][1] - 5))
+        elif hub_name == "Morgue":
+            counter_text = f"Morgue: {model.morgue_count}"
+            counter_rendered = small_font.render(counter_text, True, (255, 255, 255))
+            screen.blit(counter_rendered, (hub["pos"][0] - counter_rendered.get_width() // 2, hub["pos"][1] - 5))
 
     # Draw agents
     for agent in model.agents:
@@ -59,7 +68,7 @@ def draw(model):
             x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
             pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline for dead
 
-    # Dashboard (top area)
+    # Dashboard (top area, remove Morgue and Prison counters)
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, 800, 100))  # Grey dashboard background
     metrics = [
         f"Week: {model.week}",
@@ -67,7 +76,7 @@ def draw(model):
         f"Resources: {model.resources}",
         f"Conflict Rate: {model.conflict_rate:.2f}",
         f"Stress: {model.stress:.0f}",
-        f"Population: {len(model.living_settlers)}"
+        f"Population: {len(model.living_agents)}"
     ]
     for i, text in enumerate(metrics):
         rendered = font.render(text, True, (255, 255, 255))
