@@ -17,8 +17,8 @@ class SettlerAgent(Agent):
         hub_pos = HUBS[self.target_hub]["pos"]
         target_x, target_y = hub_pos
         # Move toward target hub more slowly, clamp to stay on-screen
-        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slower movement
-        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slower movement
+        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Keep slow movement
+        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Keep slow movement
         self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
         # Randomly change hub based on purpose and stress
         if random.random() < 0.2:  # Increased chance for more movement
@@ -64,9 +64,9 @@ class LEAgent(Agent):
         self.patrol_index = 0  # Track current patrol hub
 
     def step(self):
-        # Patrol all hubs in sequence or randomly
+        # Patrol all hubs more actively, prioritize systematic patrols
         hubs = list(HUBS.keys())
-        if random.random() < 0.7:  # 70% chance to patrol systematically, 30% random
+        if random.random() < 0.9:  # 90% chance to patrol systematically, 10% random for variety
             self.patrol_index = (self.patrol_index + 1) % len(hubs)
             self.target_hub = hubs[self.patrol_index]
         else:
@@ -74,9 +74,9 @@ class LEAgent(Agent):
         
         hub_pos = HUBS[self.target_hub]["pos"]
         target_x, target_y = hub_pos
-        # Move toward target hub more slowly, clamp to stay on-screen
-        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slower movement
-        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slower movement
+        # Move toward target hub faster, clamp to stay on-screen
+        new_x = self.pos[0] + (target_x - self.pos[0]) // 10  # Faster movement for patrols
+        new_y = self.pos[1] + (target_y - self.pos[1]) // 10  # Faster movement for patrols
         self.pos = (max(5, min(795, new_x)), max(5, min(595, new_y)))
 
 class GovernanceModel(Model):
@@ -85,7 +85,7 @@ class GovernanceModel(Model):
         self.civility = 50
         self.resources = 100  # Initial resources
         self.week = 0
-        self.steps_per_week = 50  # 50 steps = 1 week for more leisurely observation
+        self.steps_per_week = 100  # 100 steps = 1 week for slower observation
         self.step_count = 0
         self.conflict_rate = 0
         self.changes_log = []  # Log of key changes
@@ -111,7 +111,7 @@ class GovernanceModel(Model):
         self.step_count += 1
         if self.step_count % self.steps_per_week == 0:
             self.week += 1
-            self.trigger_random_event()  # Trigger a random event each week
+            self.trigger_random_event()  # Trigger a random event every other week for slower pace
             self.reduce_stress_over_time()  # Reduce stress based on conditions
             self.changes_log.append(f"Week {self.week}: Civility {self.civility}, Resources {self.resources}, Stress {self.stress}, Population {len(self.living_settlers)}")
 
@@ -130,11 +130,11 @@ class GovernanceModel(Model):
                 if agent.is_bad and agent.revealed:
                     nearby_agents = [other for other in self.agents if isinstance(other, SettlerAgent) and other != agent and 
                                     abs(other.pos[0] - agent.pos[0]) < 50 and abs(other.pos[1] - agent.pos[1]) < 50]
-                    if len(nearby_agents) < 2 and random.random() < 0.1:  # 10% chance of incident if isolated
+                    if len(nearby_agents) < 2 and random.random() < 0.05:  # Reduced to 5% for slower population drop
                         self.civility -= 3  # Incident reduces civility
                         adjust_stress(self, 10, "Incident - Bad actor attacked isolated settler")
-                        # Check for death from violent assault (medium chance, 30%)
-                        if random.random() < 0.3:
+                        # Check for death from violent assault (reduced to 10%)
+                        if random.random() < 0.1:
                             self.handle_death(agent, "Violent assault by bad actor")
                         # Trigger LEO response
                         nearby_leos = [leo for leo in self.agents if isinstance(leo, LEAgent) and 
@@ -148,12 +148,12 @@ class GovernanceModel(Model):
                             adjust_stress(self, -10, "Bad actor imprisoned, reducing stress for good actors")  # Stress reduction
                             self.changes_log.append(f"Week {self.week}: Bad actor imprisoned, -5 resources, -10 stress")
 
-                # Check for death at Medical Bay (low chance, 5%)
-                if agent.target_hub == "Medical Bay" and random.random() < 0.05:
+                # Check for death at Medical Bay (reduced to 1%)
+                if agent.target_hub == "Medical Bay" and random.random() < 0.01:
                     self.handle_death(agent, "Medical complications")
                 
-                # Check for death at damaged hubs after adverse events
-                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"] and random.random() < 0.1:
+                # Check for death at damaged hubs after adverse events (reduced to 3%)
+                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"] and random.random() < 0.03:
                     self.handle_death(agent, "Risky repair at damaged hub")
 
         # Apply prison upkeep cost and stress reduction
@@ -178,7 +178,8 @@ class GovernanceModel(Model):
 
     def trigger_random_event(self):
         from src.events import trigger_random_event  # Import here to avoid circular imports
-        trigger_random_event(self)
+        if self.week % 2 == 0:  # Trigger events every other week for slower pace
+            trigger_random_event(self)
 
     def reduce_stress_over_time(self):
         # Reduce stress if civility is high or no incidents recently

@@ -3,10 +3,11 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadA
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.5")
+pygame.display.set_caption("Space Governance Sim V2.6")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
 small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
+tiny_font = pygame.font.Font(None, 14)  # Tiny font for change log
 
 # Hub definitions (import from hubs.py, but include here for completeness)
 HUBS = {
@@ -72,11 +73,11 @@ def draw(model):
         rendered = font.render(text, True, (255, 255, 255))
         screen.blit(rendered, (10, 10 + i * 20))
 
-    # Change log (scrolling text, simplified)
+    # Change log (scrolling text, smaller font)
     changes = model.changes_log[-5:]  # Show last 5 changes
     for i, text in enumerate(changes):
-        rendered = font.render(text, True, (255, 255, 255))
-        screen.blit(rendered, (400, 10 + i * 20))
+        rendered = tiny_font.render(text, True, (255, 255, 255))
+        screen.blit(rendered, (400, 10 + i * 15))  # Tighter spacing for smaller text
 
     # Civility gauge (bottom)
     pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (10, 550, model.civility * 4, 10))
