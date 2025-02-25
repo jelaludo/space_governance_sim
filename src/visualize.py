@@ -3,10 +3,10 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadA
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard and glossary
-pygame.display.set_caption("Space Governance Sim V2.9")
+pygame.display.set_caption("Space Governance Sim V3.0")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
-small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels and glossary
+small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels and counters
 tiny_font = pygame.font.Font(None, 14)  # Tiny font for change log
 
 # Hub definitions (import from hubs.py, but include here for completeness)
@@ -23,24 +23,32 @@ HUBS = {
     "Research Lab": {"pos": (300, 450), "risk": 0.5, "purpose": "innovation"},       # Spoke S
     "Mining Outpost": {"pos": (500, 450), "risk": 0.7, "purpose": "resources"},      # Spoke S
     "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"},           # Spoke top
-    "Morgue": {"pos": (450, 300), "risk": 0.1, "purpose": "absorbing"}              # Near center for visibility
+    "Morgue": {"pos": (700, 300), "risk": 0.1, "purpose": "absorbing"}              # Far right, near center for visibility
 }
 
 def draw(model):
     screen.fill((0, 0, 0))
-    # Draw glossary on the left
+    # Draw glossary on the left with icons
     glossary = [
-        "Grey Circle/Square: Neutral Settler",
-        "Orange Circle/Square: Hidden Bad Actor",
-        "Red Circle/Square: Revealed Bad Actor",
-        "Blue Circle: Good Law Enforcement",
-        "Purple Circle: Corrupt Law Enforcement",
-        "Dark Grey Circle: Dead Agent"
+        ("Neutral Settler (M)", (128, 128, 128), pygame.Rect(10, 10, 10, 10)),  # Grey square (male)
+        ("Neutral Settler (F)", (128, 128, 128), (30, 15, 10, 0)),  # Grey dot (female, circle)
+        ("Hidden Bad Actor (M)", (255, 165, 0), pygame.Rect(10, 30, 10, 10)),  # Orange square (male)
+        ("Hidden Bad Actor (F)", (255, 165, 0), (30, 35, 10, 0)),  # Orange dot (female, circle)
+        ("Revealed Bad Actor (M)", (255, 0, 0), pygame.Rect(10, 50, 10, 10)),  # Red square (male)
+        ("Revealed Bad Actor (F)", (255, 0, 0), (30, 55, 10, 0)),  # Red dot (female, circle)
+        ("Good Law Enforcement (M)", (0, 0, 255), pygame.Rect(10, 70, 10, 10)),  # Blue square (male LEO)
+        ("Good Law Enforcement (F)", (0, 0, 255), (30, 75, 10, 0)),  # Blue dot (female LEO)
+        ("Corrupt Law Enforcement", (255, 0, 128), (30, 95, 10, 0)),  # Purple dot (corrupt LEO, circle)
+        ("Dead Agent", (100, 100, 100), (30, 115, 10, 0))  # Dark grey dot (dead, circle)
     ]
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, 200, 600))  # Grey background for glossary
-    for i, text in enumerate(glossary):
+    for i, (text, color, shape) in enumerate(glossary):
+        if isinstance(shape, pygame.Rect):  # Square for male agents
+            pygame.draw.rect(screen, color, (shape.x, shape.y, 10, 10))
+        else:  # Circle for female agents and others
+            pygame.draw.circle(screen, color, (shape[0], shape[1]), 5)
         rendered = small_font.render(text, True, (255, 255, 255))
-        screen.blit(rendered, (10, 10 + i * 20))
+        screen.blit(rendered, (50, 10 + i * 20))  # Text next to icon
 
     # Draw hubs with colors based on risk and counters
     for hub_name, hub in HUBS.items():
@@ -67,20 +75,26 @@ def draw(model):
             # Clamp position to stay within 800x600, adjust for glossary
             x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             if agent.gender == "M":
-                pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))
+                pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))  # Square for male
             else:
-                pygame.draw.circle(screen, color, (x, y), 5)
+                pygame.draw.circle(screen, color, (x, y), 5)  # Dot for female
         elif isinstance(agent, LEAgent):
             color = (255, 0, 128) if agent.is_bad else (0, 0, 255)  # Purple for corrupt, blue for good
             x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
-            pygame.draw.circle(screen, color, (x, y), 5)
+            if agent.gender == "M":
+                pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))  # Square for male LEO
+            else:
+                pygame.draw.circle(screen, color, (x, y), 5)  # Dot for female LEO
         elif isinstance(agent, PrisonAgent):
             x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
             color = (255, 0, 0) if agent.is_bad else (128, 128, 128)  # Red for bad, grey for others
-            pygame.draw.circle(screen, color, (x, y), 5, 2)  # Grey outline for prisoners
+            if agent.original_gender == "M":
+                pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10), 2)  # Outline square for male prisoners
+            else:
+                pygame.draw.circle(screen, color, (x, y), 5, 2)  # Outline dot for female prisoners
         elif isinstance(agent, DeadAgent):
             x, y = max(205, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))  # Shift right to avoid glossary
-            pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline for dead
+            pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline dot for dead
 
     # Dashboard (top area, remove Morgue and Prison counters)
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, 800, 100))  # Grey dashboard background

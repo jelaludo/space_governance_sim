@@ -7,7 +7,7 @@ from src.stressors import adjust_stress, STRESS_EVENTS
 class SettlerAgent(Agent):
     def __init__(self, model, gender, is_bad=False):
         super().__init__(model)
-        self.gender = gender  # "M" for men (squares), "F" for women (circles)
+        self.gender = gender  # "M" for men (squares), "F" for women (circles/dots)
         self.is_bad = is_bad  # Bad actor flag
         self.revealed = False if is_bad else True  # Hidden bad actors
         self.pos = (random.randint(0, 700), random.randint(0, 550))  # Larger area for 800x600
@@ -16,19 +16,25 @@ class SettlerAgent(Agent):
     def step(self):
         hub_pos = HUBS[self.target_hub]["pos"]
         target_x, target_y = hub_pos
-        # Move toward target hub more slowly, clamp to stay on-screen, add slight jitter
-        new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slow movement
-        new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slow movement
-        jitter_x = random.randint(-5, 5)  # Slight random jitter for vibrancy
-        jitter_y = random.randint(-5, 5)  # Slight random jitter for vibrancy
+        # Move toward target hub very slowly and smoothly, clamp to stay on-screen
+        new_x = self.pos[0] + (target_x - self.pos[0]) // 30  # Slower, smoother movement
+        new_y = self.pos[1] + (target_y - self.pos[1]) // 30  # Slower, smoother movement
+        jitter_x = random.randint(-3, 3)  # Reduced jitter for smoother motion
+        jitter_y = random.randint(-3, 3)  # Reduced jitter for smoother motion
         self.pos = (max(5, min(795, new_x + jitter_x)), max(5, min(595, new_y + jitter_y)))
-        # Randomly change hub based on purpose and stress, increase farm/factory visits
+        # Check if agent "touches" the target hub (within 20 pixels) to trigger stat changes
+        if abs(self.pos[0] - target_x) <= 20 and abs(self.pos[1] - target_y) <= 20:
+            if self.target_hub in ["Farming Module", "Factory", "Water Treatment", "Command Center"]:
+                self.model.resources = min(200, self.model.resources + random.randint(1, 3))  # Cap resources at 200, increase by 1-3
+            elif self.target_hub in ["Gym/Recreation", "Entertainment District"]:
+                self.reduce_stress()
+        # Randomly change hub based on purpose and stress, increase remote hub visits
         if random.random() < 0.3:  # Increased chance for more movement (30%)
             if self.is_bad and self.revealed:
                 self.target_hub = random.choice(["Entertainment District", "Power Plant", "Mining Outpost", "Prison Hub"])
             else:
-                if random.random() < 0.2:  # 20% chance each for Farm and Factory
-                    self.target_hub = random.choice(["Farming Module", "Factory"])
+                if random.random() < 0.2:  # 20% chance each for remote hubs
+                    self.target_hub = random.choice(["Factory", "Water Treatment", "Command Center", "Farming Module"])
                 else:
                     purposes = [h for h in HUBS if HUBS[h]["purpose"] in ["living", "morale", "health", "survival"]]
                     remote_hubs = ["Power Plant", "Mining Outpost", "Research Lab"]
@@ -36,9 +42,6 @@ class SettlerAgent(Agent):
                         self.target_hub = random.choice(remote_hubs)
                     else:
                         self.target_hub = random.choice(purposes)
-        # Increase resources when visiting Farm or Factory
-        if self.target_hub in ["Farming Module", "Factory"]:
-            self.model.resources = min(200, self.model.resources + random.randint(1, 3))  # Cap resources at 200, increase by 1-3
 
     def reduce_stress(self):
         # Reduce stress when visiting morale-boosting hubs
@@ -60,7 +63,7 @@ class PrisonAgent(Agent):
 class DeadAgent(Agent):
     def __init__(self, model, original_agent):
         super().__init__(model)
-        self.pos = HUBS["Morgue"]["pos"]  # Morgue hub position
+        self.pos = HUBS["Morgue"]["pos"]  # Morgue hub position (moved further away)
         self.is_dead = True
         self.original_gender = original_agent.gender  # Store original gender for visualization
 
@@ -72,6 +75,7 @@ class LEAgent(Agent):
     def __init__(self, model, is_bad=False):
         super().__init__(model)
         self.is_bad = is_bad  # Corrupt LEO chance (e.g., 5%)
+        self.gender = "M" if random.random() < 0.9 else "F"  # 90% male, 10% female for LEOs
         self.pos = (random.randint(0, 700), random.randint(0, 550))  # Larger area for 800x600
         self.patrol_index = 0  # Track current patrol hub
         self.chasing = None  # Track if chasing a bad actor
@@ -96,17 +100,17 @@ class LEAgent(Agent):
                 self.model.changes_log.append(f"Week {self.model.week}: Bad actor imprisoned by LEO, -5 resources, -10 stress, Prison now {self.model.prison_count}")
                 self.chasing = None  # Stop chasing
         else:
-            # Systematic patrol of all hubs in fixed order, no randomness, slower movement
+            # Systematic patrol of all hubs in fixed order, no randomness, extra slow movement
             hubs = list(HUBS.keys())
             self.patrol_index = (self.patrol_index + 1) % len(hubs)  # Always systematic, no randomness
             self.target_hub = hubs[self.patrol_index]
             hub_pos = HUBS[self.target_hub]["pos"]
             target_x, target_y = hub_pos
-            # Move toward target hub more slowly, clamp to stay on-screen, add slight jitter
-            new_x = self.pos[0] + (target_x - self.pos[0]) // 20  # Slower movement
-            new_y = self.pos[1] + (target_y - self.pos[1]) // 20  # Slower movement
-            jitter_x = random.randint(-5, 5)  # Slight random jitter for vibrancy
-            jitter_y = random.randint(-5, 5)  # Slight random jitter for vibrancy
+            # Move toward target hub extra slowly, clamp to stay on-screen, add slight jitter
+            new_x = self.pos[0] + (target_x - self.pos[0]) // 40  # Extra slow movement for LEOs
+            new_y = self.pos[1] + (target_y - self.pos[1]) // 40  # Extra slow movement for LEOs
+            jitter_x = random.randint(-3, 3)  # Reduced jitter for smoother motion
+            jitter_y = random.randint(-3, 3)  # Reduced jitter for smoother motion
             self.pos = (max(5, min(795, new_x + jitter_x)), max(5, min(595, new_y + jitter_y)))
             # Check for bad actors acting violently to initiate chase
             for agent in self.model.agents:
@@ -131,8 +135,8 @@ class GovernanceModel(Model):
         self.morgue_count = 0  # Counter for dead agents in Morgue
         self.prison_count = 0  # Counter for imprisoned agents in Prison
 
-        # Update HUBS to include Morgue
-        HUBS["Morgue"] = {"pos": (450, 300), "risk": 0.1, "purpose": "absorbing"}  # Near center for visibility
+        # Update HUBS to include Morgue (moved further away)
+        HUBS["Morgue"] = {"pos": (700, 300), "risk": 0.1, "purpose": "absorbing"}  # Far right, near center for visibility
 
         # Create agents with unique IDs assigned by Mesa, double initial population
         self.living_agents = []  # Track all living agents (settlers + LEOs)
@@ -165,8 +169,11 @@ class GovernanceModel(Model):
                     agent.is_bad = True
                     agent.revealed = False  # Starts as hidden (orange)
                     adjust_stress(self, 5, "Good actor turned bad due to stress")
-                # Check for stress reduction from visiting hubs
-                agent.reduce_stress()
+                # Check for stress reduction from visiting hubs (triggered by touching hub)
+                if agent.target_hub in ["Gym/Recreation", "Entertainment District"]:
+                    hub_pos = HUBS[agent.target_hub]["pos"]
+                    if abs(agent.pos[0] - hub_pos[0]) <= 20 and abs(agent.pos[1] - hub_pos[1]) <= 20 and random.random() < 0.1:
+                        adjust_stress(self, -5, "Agent visited morale hub")
                 # Check for incidents with weaker, isolated settlers
                 if agent.is_bad and agent.revealed:
                     nearby_agents = [other for other in self.agents if isinstance(other, SettlerAgent) and other != agent and 
@@ -180,12 +187,16 @@ class GovernanceModel(Model):
                         # Trigger LEO chase (handled in LEAgent.step())
 
                 # Check for death at Medical Bay (reduced to 0.3%)
-                if agent.target_hub == "Medical Bay" and random.random() < 0.003:
-                    self.handle_death(agent, "Medical complications")
+                if agent.target_hub == "Medical Bay":
+                    hub_pos = HUBS["Medical Bay"]["pos"]
+                    if abs(agent.pos[0] - hub_pos[0]) <= 20 and abs(agent.pos[1] - hub_pos[1]) <= 20 and random.random() < 0.003:
+                        self.handle_death(agent, "Medical complications")
                 
                 # Check for death at damaged hubs after adverse events (reduced to 1%)
-                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"] and random.random() < 0.01:
-                    self.handle_death(agent, "Risky repair at damaged hub")
+                if self.step_count % self.steps_per_week < 5 and agent.target_hub in ["Power Plant", "Factory", "Mining Outpost"]:
+                    hub_pos = HUBS[agent.target_hub]["pos"]
+                    if abs(agent.pos[0] - hub_pos[0]) <= 20 and abs(agent.pos[1] - hub_pos[1]) <= 20 and random.random() < 0.01:
+                        self.handle_death(agent, "Risky repair at damaged hub")
 
         # Apply prison upkeep cost and stress reduction
         prisoners = [a for a in self.agents if isinstance(a, PrisonAgent)]
