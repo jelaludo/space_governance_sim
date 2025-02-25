@@ -3,12 +3,12 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
-pygame.display.set_caption("Space Governance Sim V2.3")
+pygame.display.set_caption("Space Governance Sim V2.4")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 24)  # Regular font for dashboard
 small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
 
-# Hub definitions (from model.py)
+# Hub definitions (import from hubs.py, but include here for completeness)
 HUBS = {
     "Housing District": {"pos": (400, 300), "risk": 0.1, "purpose": "living"},  # Center
     "Gym/Recreation": {"pos": (400, 250), "risk": 0.4, "purpose": "morale"},    # Center
@@ -60,7 +60,7 @@ def draw(model):
         f"Civility: {model.civility}",
         f"Resources: {model.resources}",
         f"Conflict Rate: {model.conflict_rate:.2f}",
-        f"Stress: {model.stress:.0f}"  # Added stress to dashboard
+        f"Stress: {model.stress:.0f}"
     ]
     for i, text in enumerate(metrics):
         rendered = font.render(text, True, (255, 255, 255))

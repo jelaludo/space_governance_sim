@@ -1,21 +1,8 @@
 from mesa import Agent, Model
 import random
-
-# Hub definitions in hub-and-spoke pattern (housing, gym, medical in center at (400, 300))
-HUBS = {
-    "Housing District": {"pos": (400, 300), "risk": 0.1, "purpose": "living"},  # Center
-    "Gym/Recreation": {"pos": (400, 250), "risk": 0.4, "purpose": "morale"},    # Center
-    "Medical Bay": {"pos": (400, 350), "risk": 0.2, "purpose": "health"},        # Center
-    "Command Center": {"pos": (200, 200), "risk": 0.1, "purpose": "governance"},  # Spoke NW
-    "Factory": {"pos": (600, 200), "risk": 0.5, "purpose": "production"},        # Spoke NE
-    "Farming Module": {"pos": (200, 400), "risk": 0.2, "purpose": "survival"},   # Spoke SW
-    "Entertainment District": {"pos": (600, 400), "risk": 0.8, "purpose": "social"},  # Spoke SE
-    "Power Plant": {"pos": (300, 150), "risk": 0.7, "purpose": "infrastructure"},    # Spoke N
-    "Water Treatment": {"pos": (500, 150), "risk": 0.4, "purpose": "survival"},      # Spoke N
-    "Research Lab": {"pos": (300, 450), "risk": 0.5, "purpose": "innovation"},       # Spoke S
-    "Mining Outpost": {"pos": (500, 450), "risk": 0.7, "purpose": "resources"},      # Spoke S
-    "Prison Hub": {"pos": (400, 150), "risk": 0.9, "purpose": "security"}            # Spoke top
-}
+from src.hubs import HUBS
+from src.events import trigger_random_event
+from src.stressors import adjust_stress, STRESS_EVENTS
 
 class SettlerAgent(Agent):
     def __init__(self, model, gender, is_bad=False):
@@ -40,6 +27,11 @@ class SettlerAgent(Agent):
             else:
                 purposes = [h for h in HUBS if HUBS[h]["purpose"] in ["living", "morale", "health", "survival"]]
                 self.target_hub = random.choice(purposes)
+
+    def reduce_stress(self):
+        # Reduce stress when visiting morale-boosting hubs
+        if self.target_hub in ["Gym/Recreation", "Entertainment District"] and random.random() < 0.1:
+            adjust_stress(self.model, -5, "Agent visited morale hub")
 
 class PrisonAgent(Agent):
     def __init__(self, model):
@@ -98,6 +90,7 @@ class GovernanceModel(Model):
         if self.step_count % self.steps_per_week == 0:
             self.week += 1
             self.trigger_random_event()  # Trigger a random event each week
+            self.reduce_stress_over_time()  # Reduce stress based on conditions
             self.changes_log.append(f"Week {self.week}: Civility {self.civility}, Resources {self.resources}, Stress {self.stress}")
 
         self.agents.shuffle_do("step")  # Randomly activate agents
@@ -108,15 +101,16 @@ class GovernanceModel(Model):
                 if not agent.is_bad and random.random() < (self.stress / 1000):  # 0.1% per stress point
                     agent.is_bad = True
                     agent.revealed = False  # Starts as hidden (orange)
-                    self.changes_log.append(f"Week {self.week}: Good actor turned bad due to stress")
+                    adjust_stress(self, 5, "Good actor turned bad due to stress")
+                # Check for stress reduction from visiting hubs
+                agent.reduce_stress()
                 # Check for incidents with weaker, isolated settlers
                 if agent.is_bad and agent.revealed:
                     nearby_agents = [other for other in self.agents if isinstance(other, SettlerAgent) and other != agent and 
                                     abs(other.pos[0] - agent.pos[0]) < 50 and abs(other.pos[1] - agent.pos[1]) < 50]
                     if len(nearby_agents) < 2 and random.random() < 0.1:  # 10% chance of incident if isolated
                         self.civility -= 3  # Incident reduces civility
-                        self.stress += 10  # Increase stress from incident
-                        self.changes_log.append(f"Week {self.week}: Incident - Bad actor attacked isolated settler")
+                        adjust_stress(self, 10, "Incident - Bad actor attacked isolated settler")
                         # Trigger LEO response
                         nearby_leos = [leo for leo in self.agents if isinstance(leo, LEAgent) and 
                                       abs(leo.pos[0] - agent.pos[0]) < 50 and abs(leo.pos[1] - agent.pos[1]) < 50]
@@ -126,112 +120,23 @@ class GovernanceModel(Model):
                             self.agents.add(prisoner)
                             self.resources -= 5  # Resource cost for prison
                             self.civility = max(0, self.civility - 2)  # Slight civility drop
-                            self.stress += 5  # Additional stress from imprisonment
-                            self.changes_log.append(f"Week {self.week}: Bad actor imprisoned, -5 resources")
+                            adjust_stress(self, 5, "Bad actor imprisoned")
 
         # Decay stress slightly each step
-        self.stress = max(0, self.stress - 0.1)
+        adjust_stress(self, -0.1, "Natural stress decay")
         # Update metrics
         self.update_metrics()
 
     def trigger_random_event(self):
-        events = [
-            ("Power Plant Break", 20, lambda: self.power_plant_break()),
-            ("Environmental Hardship", 15, lambda: self.environmental_hardship()),
-            ("New Settler Arrival", 15, lambda: self.new_settler_arrival()),
-            ("Food Shortage", 10, lambda: self.food_shortage()),
-            ("Oxygen Leak", 10, lambda: self.oxygen_leak()),
-            ("Equipment Failure", 10, lambda: self.equipment_failure()),
-            ("Meteor Threat", 5, lambda: self.meteor_threat()),
-            ("Corruption Scandal", 5, lambda: self.corruption_scandal()),
-            ("Tech Breakthrough", 5, lambda: self.tech_breakthrough()),
-            ("Disease Outbreak", 5, lambda: self.disease_outbreak()),
-            ("Resource Discovery", 5, lambda: self.resource_discovery()),
-            ("Sabotage Attempt", 5, lambda: self.sabotage_attempt())
-        ]
-        total_weight = sum(weight for _, weight, _ in events)
-        choice = random.uniform(0, total_weight)
-        cumulative = 0
-        for name, weight, action in events:
-            cumulative += weight
-            if choice <= cumulative:
-                self.changes_log.append(f"Week {self.week}: Event - {name}")
-                action()
-                break
+        from src.events import trigger_random_event  # Import here to avoid circular imports
+        trigger_random_event(self)
 
-    def power_plant_break(self):
-        self.stress += 20
-        self.resources -= 10
-        self.changes_log.append(f"Week {self.week}: Power Plant Break - Increased visits required, -10 resources")
-
-    def environmental_hardship(self):
-        self.stress += 30
-        self.resources -= 15
-        self.step_count += 20  # Lasts 2 weeks (20 steps)
-        self.changes_log.append(f"Week {self.week}: Environmental Hardship for 2 weeks, -15 resources")
-
-    def new_settler_arrival(self):
-        self.stress += 15
-        for _ in range(5):  # Add 5 new settlers
-            gender = random.choice(["M", "F"])
-            is_bad = random.random() < 0.15  # 15% chance new settlers are bad
-            agent = SettlerAgent(self, gender, is_bad)
-            self.agents.add(agent)
-        self.changes_log.append(f"Week {self.week}: 5 New Settlers Arrived, +15 stress")
-
-    def food_shortage(self):
-        self.stress += 25
-        self.resources -= 20
-        self.changes_log.append(f"Week {self.week}: Food Shortage, -20 resources")
-
-    def oxygen_leak(self):
-        self.stress += 40
-        self.resources -= 30
-        self.civility -= 10
-        self.changes_log.append(f"Week {self.week}: Oxygen Leak, -30 resources, -10 civility")
-
-    def equipment_failure(self):
-        self.stress += 15
-        self.resources -= 10
-        hub = random.choice(list(HUBS.keys()))
-        self.changes_log.append(f"Week {self.week}: Equipment Failure at {hub}, -10 resources")
-
-    def meteor_threat(self):
-        self.stress += 30
-        self.civility -= 5
-        self.changes_log.append(f"Week {self.week}: Meteor Threat, -5 civility")
-
-    def corruption_scandal(self):
-        self.stress += 25
-        self.civility -= 15
-        for agent in self.agents:
-            if isinstance(agent, LEAgent) and random.random() < 0.3:  # 30% chance any LEO is corrupt
-                agent.is_bad = True
-        self.changes_log.append(f"Week {self.week}: Corruption Scandal, -15 civility")
-
-    def tech_breakthrough(self):
-        self.stress -= 10
-        self.resources += 15
-        self.changes_log.append(f"Week {self.week}: Tech Breakthrough, +15 resources, -10 stress")
-
-    def disease_outbreak(self):
-        self.stress += 20
-        self.resources -= 20
-        self.civility -= 5
-        self.changes_log.append(f"Week {self.week}: Disease Outbreak, -20 resources, -5 civility")
-
-    def resource_discovery(self):
-        self.stress -= 15
-        self.resources += 25
-        self.changes_log.append(f"Week {self.week}: Resource Discovery, +25 resources, -15 stress")
-
-    def sabotage_attempt(self):
-        self.stress += 35
-        self.civility -= 10
-        for agent in self.agents:
-            if isinstance(agent, SettlerAgent) and agent.is_bad and random.random() < 0.2:
-                agent.revealed = True  # Reveal bad actors involved in sabotage
-        self.changes_log.append(f"Week {self.week}: Sabotage Attempt, -10 civility")
+    def reduce_stress_over_time(self):
+        # Reduce stress if civility is high or no incidents recently
+        if self.civility >= 70 and random.random() < 0.2:
+            adjust_stress(self, -5, "High civility reduces stress")
+        if len([log for log in self.changes_log[-10:] if "Incident" in log]) == 0 and self.week > 5 and random.random() < 0.1:
+            adjust_stress(self, -10, "Long time without incidents reduces stress")
 
     def update_metrics(self):
         bad_actors = sum(1 for a in self.agents if isinstance(a, SettlerAgent) and a.is_bad and a.revealed)
