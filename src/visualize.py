@@ -1,28 +1,78 @@
 import pygame
-from src.model import GovernanceModel
+from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent
 
 pygame.init()
-screen = pygame.display.set_mode((600, 400))
-pygame.display.set_caption("Space Governance Sim V1")
+screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard
+pygame.display.set_caption("Space Governance Sim V2.2")
 clock = pygame.time.Clock()
+font = pygame.font.Font(None, 24)  # Regular font for dashboard
+small_font = pygame.font.Font(None, 16)  # Smaller font for hub labels
+
+# Hub definitions (from model.py)
+HUBS = {
+    "Command Center": {"pos": (50, 50), "risk": 0.1, "purpose": "governance"},
+    "Factory": {"pos": (150, 100), "risk": 0.5, "purpose": "production"},
+    "Farming Module": {"pos": (250, 150), "risk": 0.2, "purpose": "survival"},
+    "Housing District": {"pos": (350, 200), "risk": 0.1, "purpose": "living"},
+    "Entertainment District": {"pos": (450, 250), "risk": 0.8, "purpose": "social"},
+    "Gym/Recreation": {"pos": (550, 300), "risk": 0.4, "purpose": "morale"},
+    "Power Plant": {"pos": (650, 350), "risk": 0.7, "purpose": "infrastructure"},
+    "Water Treatment": {"pos": (100, 400), "risk": 0.4, "purpose": "survival"},
+    "Medical Bay": {"pos": (200, 450), "risk": 0.2, "purpose": "health"},
+    "Research Lab": {"pos": (300, 500), "risk": 0.5, "purpose": "innovation"},
+    "Mining Outpost": {"pos": (400, 550), "risk": 0.7, "purpose": "resources"},
+    "Prison Hub": {"pos": (500, 600), "risk": 0.9, "purpose": "security"}
+}
 
 def draw(model):
-    screen.fill((0, 0, 0))  # Black background
-    # Draw hubs
-    hub_positions = [(100, 100), (300, 200), (500, 300)]
-    for hub in hub_positions:
-        pygame.draw.circle(screen, (255, 255, 255), hub, 20, 1)
+    screen.fill((0, 0, 0))
+    # Draw hubs with colors based on risk
+    for hub_name, hub in HUBS.items():
+        risk = hub["risk"]
+        color = (0, 255, 0) if risk < 0.3 else (255, 255, 0) if risk < 0.6 else (255, 0, 0)
+        pygame.draw.circle(screen, color, hub["pos"], 20, 1)
+        # Label hubs above with smaller font
+        rendered = small_font.render(hub_name, True, (255, 255, 255))
+        screen.blit(rendered, (hub["pos"][0] - rendered.get_width() // 2, hub["pos"][1] - 25))
 
-    # Draw agents (updated to use model.agents)
-    for agent in model.agents:  # Changed from model.schedule.agents
-        color = (255, 0, 0) if agent.is_bad and agent.revealed else (255, 165, 0) if agent.is_bad else (128, 128, 128)
-        if agent.gender == "M":
-            pygame.draw.rect(screen, color, (agent.pos[0] - 5, agent.pos[1] - 5, 10, 10))
-        else:
-            pygame.draw.circle(screen, color, agent.pos, 5)
-    
-    # Civility gauge
-    pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (10, 10, model.civility, 10))
+    # Draw agents
+    for agent in model.agents:
+        if isinstance(agent, SettlerAgent):
+            color = (255, 0, 0) if agent.is_bad and agent.revealed else (255, 165, 0) if agent.is_bad else (128, 128, 128)
+            # Clamp position to stay within 800x600
+            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            if agent.gender == "M":
+                pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))
+            else:
+                pygame.draw.circle(screen, color, (x, y), 5)
+        elif isinstance(agent, LEAgent):
+            color = (255, 0, 128) if agent.is_bad else (0, 0, 255)  # Purple for corrupt, blue for good
+            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            pygame.draw.circle(screen, color, (x, y), 5)
+        elif isinstance(agent, PrisonAgent):
+            x, y = max(5, min(795, agent.pos[0])), max(5, min(595, agent.pos[1]))
+            pygame.draw.circle(screen, (128, 128, 128), (x, y), 5, 2)  # Grey outline for prisoners
+
+    # Dashboard (top area)
+    pygame.draw.rect(screen, (50, 50, 50), (0, 0, 800, 100))  # Grey dashboard background
+    metrics = [
+        f"Week: {model.week}",
+        f"Civility: {model.civility}",
+        f"Resources: {model.resources}",
+        f"Conflict Rate: {model.conflict_rate:.2f}"
+    ]
+    for i, text in enumerate(metrics):
+        rendered = font.render(text, True, (255, 255, 255))
+        screen.blit(rendered, (10, 10 + i * 20))
+
+    # Change log (scrolling text, simplified)
+    changes = model.changes_log[-5:]  # Show last 5 changes
+    for i, text in enumerate(changes):
+        rendered = font.render(text, True, (255, 255, 255))
+        screen.blit(rendered, (400, 10 + i * 20))
+
+    # Civility gauge (bottom)
+    pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (10, 550, model.civility * 4, 10))
     pygame.display.flip()
 
 def run():
