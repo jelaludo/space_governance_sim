@@ -3,7 +3,7 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadA
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard and glossary
-pygame.display.set_caption("Space Governance Sim V3.3")
+pygame.display.set_caption("Space Governance Sim V3.6")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 20)  # Slightly smaller font for dashboard to fit better
 small_font = pygame.font.Font(None, 14)  # Smaller font for hub labels, counters, and glossary
@@ -68,32 +68,36 @@ def draw(model):
             counter_rendered = small_font.render(counter_text, True, (255, 255, 255))
             screen.blit(counter_rendered, (hub["pos"][0] - counter_rendered.get_width() // 2, hub["pos"][1] - 5))
 
-    # Draw agents with animation
+    # Draw agents with animation (fixed position unpacking)
     for agent in model.agents:
         if isinstance(agent, SettlerAgent):
             color = (255, 0, 0) if agent.is_bad and agent.revealed else (255, 165, 0) if agent.is_bad else (128, 128, 128)
             # Clamp position to stay within 800x600, adjust for glossary and spacing
-            x, y = max(225, min(775, agent.pos[0])), max(25, min(575, agent.pos[1]))  # Increased margins for spacing
+            x = max(225, min(775, agent.pos[0]))  # X coordinate
+            y = max(25, min(575, agent.pos[1]))   # Y coordinate
             if agent.gender == "M":
                 pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))  # Square for male
             else:
                 pygame.draw.circle(screen, color, (x, y), 5)  # Dot for female
         elif isinstance(agent, LEAgent):
             color = (255, 0, 128) if agent.is_bad else (0, 0, 255)  # Purple for corrupt, blue for good
-            x, y = max(225, min(775, agent.pos[0])), max(25, min(575, agent.pos[1]))  # Increased margins for spacing
+            x = max(225, min(775, agent.pos[0]))  # X coordinate
+            y = max(25, min(575, agent.pos[1]))   # Y coordinate
             if agent.gender == "M":
                 pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10))  # Square for male LEO
             else:
                 pygame.draw.circle(screen, color, (x, y), 5)  # Dot for female LEO
         elif isinstance(agent, PrisonAgent):
-            x, y = max(225, min(775, agent.pos[0])), max(25, min(575, agent.pos[1]))  # Increased margins for spacing
+            x = max(225, min(775, agent.pos[0]))  # X coordinate
+            y = max(25, min(575, agent.pos[1]))   # Y coordinate
             color = (255, 0, 0) if agent.is_bad else (128, 128, 128)  # Red for bad, grey for others
             if agent.original_gender == "M":
                 pygame.draw.rect(screen, color, (x - 5, y - 5, 10, 10), 2)  # Outline square for male prisoners
             else:
                 pygame.draw.circle(screen, color, (x, y), 5, 2)  # Outline dot for female prisoners
         elif isinstance(agent, DeadAgent):
-            x, y = max(225, min(775, agent.pos[0])), max(25, min(575, agent.pos[1]))  # Increased margins for spacing
+            x = max(225, min(775, agent.pos[0]))  # X coordinate
+            y = max(25, min(575, agent.pos[1]))   # Y coordinate
             pygame.draw.circle(screen, (100, 100, 100), (x, y), 5, 2)  # Dark grey outline dot for dead
 
     # Dashboard (top area, remove Morgue and Prison counters, smaller font)
@@ -120,21 +124,16 @@ def draw(model):
     # Civility gauge (bottom, repositioned)
     pygame.draw.rect(screen, (0, 255, 0) if model.civility > 50 else (255, 0, 0), (210, 570, model.civility * 4, 10))  # Shifted down, right
 
-    # Draw mode, start/stop, and roll next turn buttons
-    pygame.draw.rect(screen, (100, 100, 100), (700, 10, 80, 30))  # Mode toggle button
-    mode_text = "Auto" if model.is_auto else "Manual"
-    rendered = font.render(f"Mode: {mode_text}", True, (255, 255, 255))
-    screen.blit(rendered, (710, 15))  # Center text in mode button
+    # Draw manual and auto buttons (improved visibility, dynamic colors)
+    manual_color = (0, 255, 0) if model.is_manual else (150, 150, 150)  # Green if active, grey if inactive
+    auto_color = (150, 150, 150) if model.is_manual else (0, 255, 0)  # Grey if manual active, green if auto active
+    pygame.draw.rect(screen, manual_color, (700, 10, 80, 30))  # "Manual" button
+    rendered = font.render("Manual", True, (0, 0, 0))  # Black text for contrast
+    screen.blit(rendered, (720, 15))  # Center text in manual button
 
-    pygame.draw.rect(screen, (100, 100, 100), (700, 50, 80, 30))  # Start/Stop button
-    action_text = "Start" if not model.is_running else "Stop"
-    rendered = font.render(action_text, True, (255, 255, 255))
-    screen.blit(rendered, (710, 55))  # Center text in action button
-
-    pygame.draw.rect(screen, (100, 100, 100), (700, 90, 80, 30))  # Roll Next Turn button
-    roll_text = "Roll Next Turn"
-    rendered = font.render(roll_text, True, (255, 255, 255))
-    screen.blit(rendered, (705, 95))  # Center text in roll button
+    pygame.draw.rect(screen, auto_color, (700, 50, 80, 30))  # "Auto" button
+    rendered = font.render("Auto", True, (0, 0, 0))  # Black text for contrast
+    screen.blit(rendered, (720, 55))  # Center text in auto button
 
     pygame.display.flip()
 
@@ -142,29 +141,22 @@ def run():
     model = GovernanceModel()
     running = True
     auto_timer = 0
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
-                if 700 <= event.pos[0] <= 780 and 10 <= event.pos[1] <= 40:  # Click on mode button
-                    model.is_auto = not model.is_auto
-                    if not model.is_auto:
-                        model.is_running = False  # Stop auto mode when switching to manual
-                elif 700 <= event.pos[0] <= 780 and 50 <= event.pos[1] <= 80:  # Click on start/stop button
-                    if model.is_auto:
-                        model.is_running = not model.is_running  # Toggle auto mode running
-                    else:
-                        model.is_running = False  # Ensure manual mode isn't running
-                elif 700 <= event.pos[0] <= 780 and 90 <= event.pos[1] <= 120:  # Click on roll next turn button
-                    if not model.is_auto and not model.is_running and not model.is_animating:
-                        model.step()  # Initiate animation
-                elif not model.is_auto and not model.is_running and not model.is_animating:  # Manual mode, roll next turn on click anywhere else
-                    model.step()  # Initiate animation
+                if 700 <= event.pos[0] <= 780 and 10 <= event.pos[1] <= 40:  # Click on manual button
+                    model.is_manual = True  # Switch to manual mode, stopping auto
+                    if not model.is_animating:
+                        model.step()  # Trigger next turn in manual mode
+                elif 700 <= event.pos[0] <= 780 and 50 <= event.pos[1] <= 80:  # Click on auto button
+                    model.is_manual = False  # Switch to auto mode
 
-        if model.is_auto and model.is_running:
+        if not model.is_manual and not model.is_animating:  # Auto mode advances turns
             auto_timer += clock.get_rawtime() / 1000  # Convert milliseconds to seconds
-            if auto_timer >= 1.0 and not model.is_animating:  # Advance one day every second in auto mode, only if not animating
+            if auto_timer >= 1.0:  # Advance one day every second in auto mode
                 model.step()
                 auto_timer = 0
 

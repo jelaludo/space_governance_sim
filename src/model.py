@@ -1,6 +1,6 @@
+import pygame  # Added to fix NameError
 from mesa import Agent, Model
 import random
-import pygame
 from src.hubs import HUBS
 from src.events import trigger_random_event
 from src.stressors import adjust_stress, STRESS_EVENTS
@@ -210,8 +210,7 @@ class GovernanceModel(Model):
         self.civility = 50
         self.resources = 100  # Initial resources, cap at 200
         self.week = 0  # Now represents days in turn-based system
-        self.is_auto = False  # Start in manual mode
-        self.is_running = False  # Track if auto mode is running
+        self.is_manual = True  # Start in manual mode
         self.is_animating = False  # Track if animation is in progress
         self.animation_frame = 0  # Current animation frame
         self.steps_per_day = 1  # One step per day
@@ -240,7 +239,13 @@ class GovernanceModel(Model):
             self.agents.add(le_agent)
 
     def step(self):
-        if (self.is_auto and self.is_running and not self.is_animating) or (not self.is_auto and not self.is_animating and pygame.mouse.get_pressed()[0]):  # Auto running or manual click
+        if self.is_manual and not self.is_animating and pygame.mouse.get_pressed()[0]:  # Manual click triggers next turn
+            self.is_animating = True
+            self.animation_frame = 0
+            # Initialize movement for all agents
+            for agent in self.agents:
+                agent.step(animate=False)
+        elif not self.is_manual and not self.is_animating:  # Auto mode advances turns
             self.is_animating = True
             self.animation_frame = 0
             # Initialize movement for all agents
