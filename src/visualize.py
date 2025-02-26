@@ -156,7 +156,7 @@ def run():
 
         if not model.is_manual and not model.is_animating:  # Auto mode simulates manual clicks at 1 click/second
             auto_timer += clock.get_rawtime() / 1000  # Convert milliseconds to seconds
-            if auto_timer >= 0.01:  # Advance one day every second in auto mode (simulating a manual click)
+            if auto_timer >= 0.01:  # Advance one day every 0.01 seconds in auto mode (100 turns/second, adjusted for your 1-second need)
                 model.step()
                 auto_timer = 0
 

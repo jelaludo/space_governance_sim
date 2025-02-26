@@ -4,6 +4,7 @@ import random
 from src.hubs import HUBS
 from src.events import trigger_random_event
 from src.stressors import adjust_stress, STRESS_EVENTS
+from src.crimes import select_crime, apply_crime_impact
 
 class SettlerAgent(Agent):
     def __init__(self, model, gender, is_bad=False):
@@ -16,6 +17,7 @@ class SettlerAgent(Agent):
         self.start_pos = None  # Starting position for animation
         self.animation_frames = 30  # Number of frames for animation (1 second at 30 FPS)
         self.animation_frame = 0  # Current animation frame
+        self.power = sum(random.randint(1, 6) for _ in range(3))  # 3d6 roll (3-18)
 
     def step(self, animate=False):
         if not animate:  # Initialize movement for next turn
@@ -32,6 +34,21 @@ class SettlerAgent(Agent):
                 self.target_hub = random.choices(hubs, weights=weights, k=1)[0]
             self.start_pos = self.pos
             self.animation_frame = 0
+            # Check for crime if bad actor and revealed
+            if self.is_bad and self.revealed:
+                nearby_agents = [other for other in self.model.agents if isinstance(other, SettlerAgent) and other != self and 
+                                abs(other.pos[0] - self.pos[0]) < 50 and abs(other.pos[1] - self.pos[1]) < 50]
+                nearby_leas = [other for other in self.model.agents if isinstance(other, LEAgent) and 
+                              abs(other.pos[0] - self.pos[0]) < 50 and abs(other.pos[1] - self.pos[1]) < 50]
+                if nearby_agents and not nearby_leas:  # Weaker people present, no LEAs nearby
+                    weaker_agents = [agent for agent in nearby_agents if agent.power < self.power]
+                    if weaker_agents and random.random() < 0.1:  # 10% chance to commit a crime if conditions met
+                        crime_name, crime_data = select_crime()
+                        apply_crime_impact(self.model, crime_name, crime_data)
+                        # Optionally handle victim or other effects (e.g., death for murder)
+                        if crime_name == "Murder/Nonnegligent Manslaughter":
+                            victim = random.choice(weaker_agents)
+                            self.model.handle_death(victim, "Murder by bad actor")
         else:  # Animate movement
             if self.animation_frame < self.animation_frames:
                 start_x, start_y = self.start_pos
@@ -71,6 +88,7 @@ class PrisonAgent(Agent):
         self.start_pos = None  # Starting position for animation
         self.animation_frames = 30  # Number of frames for animation (1 second at 30 FPS)
         self.animation_frame = 0  # Current animation frame
+        self.power = original_agent.power  # Retain original power
 
     def step(self, animate=False):
         if not animate:  # Initialize movement for next turn
@@ -105,6 +123,7 @@ class DeadAgent(Agent):
         self.start_pos = None  # Starting position for animation
         self.animation_frames = 30  # Number of frames for animation (1 second at 30 FPS)
         self.animation_frame = 0  # Current animation frame
+        self.power = original_agent.power  # Retain original power
 
     def step(self, animate=False):
         if not animate:  # Initialize movement for next turn
@@ -140,6 +159,7 @@ class LEAgent(Agent):
         self.start_pos = None  # Starting position for animation
         self.animation_frames = 30  # Number of frames for animation (1 second at 30 FPS)
         self.animation_frame = 0  # Current animation frame
+        self.power = sum(random.randint(1, 6) for _ in range(3))  # 3d6 roll (3-18)
 
     def step(self, animate=False):
         if not animate:  # Initialize movement for next turn
@@ -277,16 +297,7 @@ class GovernanceModel(Model):
                             hub_pos = HUBS[agent.target_hub]["pos"]
                             if abs(agent.pos[0] - hub_pos[0]) <= 20 and abs(agent.pos[1] - hub_pos[1]) <= 20 and random.random() < 0.01:
                                 self.handle_death(agent, "Risky repair at damaged hub")
-                        # Check for incidents with weaker, isolated settlers
-                        if agent.is_bad and agent.revealed:
-                            nearby_agents = [other for other in self.agents if isinstance(other, SettlerAgent) and other != agent and 
-                                            abs(other.pos[0] - agent.pos[0]) < 50 and abs(other.pos[1] - agent.pos[1]) < 50]
-                            if len(nearby_agents) < 2 and random.random() < 0.05:  # Reduced to 5% for slower population drop
-                                self.civility -= 3  # Incident reduces civility
-                                adjust_stress(self, 10, "Incident - Bad actor attacked isolated settler")
-                                # Check for death from violent assault (reduced to 3%)
-                                if random.random() < 0.03:
-                                    self.handle_death(agent, "Violent assault by bad actor")
+                        # Check for incidents with weaker, isolated settlers (handled in crimes.py now)
 
                 # Apply prison upkeep cost and stress reduction
                 prisoners = [a for a in self.agents if isinstance(a, PrisonAgent)]
