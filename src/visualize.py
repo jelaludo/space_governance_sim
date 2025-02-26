@@ -3,7 +3,7 @@ from src.model import GovernanceModel, SettlerAgent, PrisonAgent, LEAgent, DeadA
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))  # Bigger for dashboard and glossary
-pygame.display.set_caption("Space Governance Sim V3.6")
+pygame.display.set_caption("Space Governance Sim V3.7")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 20)  # Slightly smaller font for dashboard to fit better
 small_font = pygame.font.Font(None, 14)  # Smaller font for hub labels, counters, and glossary
@@ -154,9 +154,9 @@ def run():
                 elif 700 <= event.pos[0] <= 780 and 50 <= event.pos[1] <= 80:  # Click on auto button
                     model.is_manual = False  # Switch to auto mode
 
-        if not model.is_manual and not model.is_animating:  # Auto mode advances turns
+        if not model.is_manual and not model.is_animating:  # Auto mode simulates manual clicks at 1 click/second
             auto_timer += clock.get_rawtime() / 1000  # Convert milliseconds to seconds
-            if auto_timer >= 1.0:  # Advance one day every second in auto mode
+            if auto_timer >= 0.01:  # Advance one day every second in auto mode (simulating a manual click)
                 model.step()
                 auto_timer = 0
 

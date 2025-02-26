@@ -239,13 +239,7 @@ class GovernanceModel(Model):
             self.agents.add(le_agent)
 
     def step(self):
-        if self.is_manual and not self.is_animating and pygame.mouse.get_pressed()[0]:  # Manual click triggers next turn
-            self.is_animating = True
-            self.animation_frame = 0
-            # Initialize movement for all agents
-            for agent in self.agents:
-                agent.step(animate=False)
-        elif not self.is_manual and not self.is_animating:  # Auto mode advances turns
+        if (self.is_manual and not self.is_animating and pygame.mouse.get_pressed()[0]) or (not self.is_manual and not self.is_animating):  # Manual click or auto mode
             self.is_animating = True
             self.animation_frame = 0
             # Initialize movement for all agents
